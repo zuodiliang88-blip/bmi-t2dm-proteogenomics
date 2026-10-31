@@ -1,3 +1,6 @@
+# Protein-to-T2DM MR following the original BMI-based candidate filter.
+# Set BMI_T2DM_ROOT to the absolute project directory and prepare the input files.
+
 options(timeout = 15)
 library(TwoSampleMR)
 library(MRInstruments)
@@ -109,7 +112,7 @@ for (file_name in sig_files) {
           dat_mr_input <- tsmr_to_rmr_format(trait1.trait2.dat)
           ivw_radial(dat_mr_input, alpha = 0.05)
         }, error = function(e) {
-          cat("Radial未完成，保留原SNP：", conditionMessage(e), "\n")
+          cat("Radial analysis failed; retaining original SNPs: ", conditionMessage(e), "\n")
           NULL
         })
         if (!is.null(radial_ivw) && is.data.frame(radial_ivw$outliers)) {
@@ -180,5 +183,5 @@ b <- merge(merge(b, b2, by = "id", all.x = TRUE), b3, by = "id", all.x = TRUE)
 b <- b[fdr_p < 0.05 & (is.na(Q_pval) | Q_pval >= 0.05) & (is.na(ple_pval) | ple_pval >= 0.05)]
 same_direction <- merge(a[, .(id, b_bmi = b)], b[, .(id, b_t2dm = b)], by = "id")
 same_direction <- same_direction[b_bmi * b_t2dm > 0]
-cat("BMI入选蛋白：", nrow(a), "；T2DM入选蛋白：", nrow(b), "；同方向蛋白：", nrow(same_direction), "\n")
+cat("Selected BMI proteins: ", nrow(a), "; selected T2DM proteins: ", nrow(b), "; concordant proteins: ", nrow(same_direction), "\n")
 print(same_direction)

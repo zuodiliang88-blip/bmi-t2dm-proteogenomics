@@ -1,9 +1,26 @@
+# Three-trait colocalization with the original trait-type helper included.
+# Set BMI_T2DM_ROOT to the absolute project directory and prepare the input files.
+
 library(dplyr)
 library(data.table)
 library(moloc)
 rm(list = ls())
 gc()
-source(file.path(Sys.getenv("BMI_T2DM_ROOT"), "moloc_typed.R"))
+# Required study helper: moloc_typed.R
+moloc_test_typed <- moloc::moloc_test
+old_assignment <- quote(listData[[i]]$type <- ifelse("Ncases" %in% names(listData[[i]]), "cc", "quant"))
+new_assignment <- quote(stopifnot(length(unique(listData[[i]]$type)) == 1L, unique(listData[[i]]$type) %in% c("quant", "cc")))
+changed <- 0L
+patch_type <- function(expr) {
+  if (identical(expr, old_assignment)) { changed <<- changed + 1L; return(new_assignment) }
+  if (is.call(expr)) for (j in seq_along(expr)) {
+    if (is.call(expr[[j]])) expr[[j]] <- patch_type(expr[[j]])
+  }
+  expr
+}
+body(moloc_test_typed) <- patch_type(body(moloc_test_typed))
+stopifnot(changed == 1L)
+rm(old_assignment, new_assignment, changed, patch_type)
 workspace_dir <- file.path(Sys.getenv("BMI_T2DM_ROOT"), "results/mr/moloc_results")
 
 bmi_path  <- file.path(Sys.getenv("BMI_T2DM_ROOT"), "data/gwas/BMI_GCST90475156.tsv.gz")
@@ -11,6 +28,10 @@ t2dm_path <- file.path(Sys.getenv("BMI_T2DM_ROOT"), "data/gwas/t2dm_EUR.txt.gz")
 
 dir.create(file.path(Sys.getenv("BMI_T2DM_ROOT"), "results/mr/moloc_results"), showWarnings = FALSE)
 
+# Candidate proteins must be selected from the primary MR results before this step.
+# Retain Wald ratio/IVW results with BH FDR < 0.05 and Q/Egger-intercept P >= 0.05
+# where available, then retain proteins with concordant BMI and T2DM effect directions.
+# Supply their original protein-file identifiers in the id column of final_55_proteins.csv.
 A <- fread(file.path(Sys.getenv("BMI_T2DM_ROOT"), "results/mr/final_55_proteins.csv"))
 base_path <- file.path(Sys.getenv("BMI_T2DM_ROOT"), "data/pqtl/ukb_cis_1mb/")
 
@@ -21,7 +42,7 @@ sig_files <- paste0(base_path, file_names)
 sig_files <- unique(sig_files)
 stopifnot(length(sig_files) == 55L, all(file.exists(sig_files)))
 
-cat("正在载入 BMI 和 T2DM GWAS 数据...\n")
+cat("Loading BMI and T2DM GWAS data...\n")
 bmi_full  <- fread(bmi_path)
 setnames(bmi_full, old=c("chr","bp","p","beta","se","A1","A2","freq","n"),
          new=c("CHR","BP","P","BETA","SE","A1","A2","EAF","N"), skip_absent=TRUE)
@@ -114,16 +135,16 @@ for(  p_file  in sig_files) {
           }
 
           moloc_summary_list[[p_name]] <- res_summary
-          cat(sprintf("   - moloc 完成. 三方共定位概率 (PPA_abc): %.4f | SNP: %s\n",
+          cat(sprintf("   - moloc completed. Three-trait posterior (PPA_abc): %.4f | SNP: %s\n",
                       pp_abc_val, res_summary$Best_SNP))
         } else {
-          cat("   - 报错: 未能提取到 ppa_table\n")
+          cat("   - Error: ppa_table was unavailable\n")
         }
       } else {
-        cat("   - 跳过: 对齐后共同 SNP 不足 50\n")
+        cat("   - Skipped: fewer than 50 aligned shared SNPs\n")
       }
     } else {
-      cat("   - 跳过: 三方合并后共同 SNP 不足 50\n")
+      cat("   - Skipped: fewer than 50 shared SNPs after merging\n")
     }
 
   }, error = function(e) {
@@ -147,9 +168,9 @@ if (length(moloc_summary_list) > 0) {
   fwrite(significant_moloc, file = file.path(Sys.getenv("BMI_T2DM_ROOT"), "results/mr/moloc_results/bfd__SIGNIFICANT_MOLOC_H4_07.csv"), sep = ",")
 
   cat("\n=======================================================\n")
-  cat(sprintf("分析完成！显著蛋白数: %d\n", nrow(significant_moloc)))
+  cat(sprintf("Analysis completed. Number of significant proteins: %d\n", nrow(significant_moloc)))
 } else {
-  cat("\n未产生有效结果。\n")
+  cat("\nNo valid results were generated.\n")
 }
 
 stopifnot(length(moloc_summary_list) == length(sig_files))

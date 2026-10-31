@@ -1,3 +1,6 @@
+# Protein-to-BMI MR; retain the original clumping and Radial IVW logic.
+# Set BMI_T2DM_ROOT to the absolute project directory and prepare the input files.
+
 options(timeout = 15)
 library(TwoSampleMR)
 library(MRInstruments)
@@ -103,7 +106,7 @@ for (file_name in sig_files) {
           dat_mr_input <- tsmr_to_rmr_format(trait1.trait2.dat)
           ivw_radial(dat_mr_input, alpha = 0.05)
         }, error = function(e) {
-          cat("Radial未完成，保留原SNP：", conditionMessage(e), "\n")
+          cat("Radial analysis failed; retaining original SNPs: ", conditionMessage(e), "\n")
           NULL
         })
         if (!is.null(radial_ivw) && is.data.frame(radial_ivw$outliers)) {

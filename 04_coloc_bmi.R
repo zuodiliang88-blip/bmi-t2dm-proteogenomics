@@ -1,3 +1,6 @@
+# Protein/BMI colocalization; both traits are quantitative.
+# Set BMI_T2DM_ROOT to the absolute project directory and prepare the input files.
+
 library(dplyr)
 library(data.table)
 library(coloc)
@@ -5,6 +8,10 @@ library(coloc)
 rm(list = ls())
 gc()
 
+# Candidate proteins must be selected from the primary MR results before this step.
+# Retain Wald ratio/IVW results with BH FDR < 0.05 and Q/Egger-intercept P >= 0.05
+# where available, then retain proteins with concordant BMI and T2DM effect directions.
+# Supply their original protein-file identifiers in the id column of final_55_proteins.csv.
 A <- fread(file.path(Sys.getenv("BMI_T2DM_ROOT"), "results/mr/final_55_proteins.csv"))
 stopifnot(nrow(A) == 55L, !anyDuplicated(A$id))
 base_path <- file.path(Sys.getenv("BMI_T2DM_ROOT"), "data/pqtl/ukb_cis_1mb/")
